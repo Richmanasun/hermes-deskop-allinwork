@@ -14,6 +14,8 @@
 </a>
 </p>
 
+> **About this fork:** This project is a personal fork of [Hermes Desktop](https://github.com/fathah/hermes-desktop). It extends the original with a built-in browser, text translation, and an AI Station module, and bundles the author's own English vocabulary notebook to support daily study and work. For the upstream release, visit the original repository.
+
 > **This project is in active development.** Features may change, and some things might break. If you run into a problem or have an idea, [open an issue](https://github.com/fathah/hermes-desktop/issues). Contributions are welcome!
 
 ## Languages

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "../../components/useI18n";
 import {
   RefreshCw,
@@ -14,12 +14,11 @@ import {
   FileText,
   Wifi,
   WifiOff,
-  MessageSquare,
   Settings2,
   ExternalLink,
 } from "lucide-react";
 
-type TabView = "services" | "chat" | "status";
+type TabView = "services" | "status";
 
 interface ServiceState {
   id: string;
@@ -27,12 +26,6 @@ interface ServiceState {
   status: "running" | "stopped" | "unknown";
   port?: number;
   description: string;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  streaming?: boolean;
 }
 
 type ServiceAction = "start" | "stop" | "restart";
@@ -214,9 +207,18 @@ function ServicesTab(): React.JSX.Element {
 
   const handleControl = useCallback(
     async (serviceId: string, action: "start" | "stop" | "restart") => {
+      // Optimistically mark the service as transitioning so the card reflects activity
+      setServices((prev) =>
+        prev.map((s) => s.id === serviceId ? { ...s, status: "unknown" as const } : s),
+      );
       const result = await window.hermesAPI.aiStationControl(serviceId, action);
-      if (!result.success) setError(result.error ?? t("aistation.serviceFailed"));
-      await loadServices();
+      if (!result.success) {
+        setError(result.error ?? t("aistation.serviceFailed"));
+        await loadServices();
+        return;
+      }
+      // Give the service 1.2 s to start / stop before querying status (matches original)
+      setTimeout(() => loadServices(), 1200);
     },
     [loadServices, t],
   );
@@ -256,157 +258,6 @@ function ServicesTab(): React.JSX.Element {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ChatTab(): React.JSX.Element {
-  const { t } = useI18n();
-  const [model, setModel] = useState("deepseek-chat");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const currentRequestIdRef = useRef<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const cleanup = window.hermesAPI.onNineRouterChunk((data) => {
-      if (data.requestId !== currentRequestIdRef.current) return;
-      if (data.error) {
-        setSending(false);
-        currentRequestIdRef.current = null;
-        return;
-      }
-      if (data.content === null) {
-        setSending(false);
-        currentRequestIdRef.current = null;
-        setMessages((prev) =>
-          prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m)),
-        );
-        return;
-      }
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant" && last.streaming) {
-          return [...prev.slice(0, -1), { ...last, content: last.content + data.content }];
-        }
-        return prev;
-      });
-    });
-    return cleanup;
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-
-    const userMsg: ChatMessage = { role: "user", content: text };
-    const assistantMsg: ChatMessage = { role: "assistant", content: "", streaming: true };
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setInput("");
-    setSending(true);
-
-    const requestId = Date.now().toString();
-    currentRequestIdRef.current = requestId;
-
-    const allMessages = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
-
-    try {
-      await window.hermesAPI.nineRouterChat(allMessages, model, requestId);
-    } catch (err) {
-      setSending(false);
-      currentRequestIdRef.current = null;
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { role: "assistant", content: err instanceof Error ? err.message : String(err), streaming: false },
-      ]);
-    }
-  }, [input, messages, model, sending]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-    },
-    [handleSend],
-  );
-
-  const handleClear = useCallback(async () => {
-    if (sending) await window.hermesAPI.nineRouterAbort();
-    setSending(false);
-    currentRequestIdRef.current = null;
-    setMessages([]);
-  }, [sending]);
-
-  return (
-    <div className="aistation-tab-content">
-      <div className="aistation-chat-header">
-        <span className="aistation-chat-model-label">{t("aistation.model")}</span>
-        <input
-          type="text"
-          className="aistation-chat-model-input"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-        <button className="btn btn-secondary btn-sm" onClick={handleClear}>
-          {t("aistation.clearChat")}
-        </button>
-      </div>
-
-      <div className="aistation-chat-messages">
-        {messages.length === 0 && (
-          <div className="aistation-chat-empty">
-            <MessageSquare size={28} style={{ opacity: 0.25 }} />
-            <span>{t("aistation.chatPlaceholder")}</span>
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}
-          >
-            <div className={`chat-bubble ${msg.role === "user" ? "chat-bubble-user" : "chat-bubble-agent"}`}
-              style={{ maxWidth: "80%" }}>
-              {msg.content}
-              {msg.streaming && (
-                <span style={{
-                  display: "inline-block",
-                  width: "2px",
-                  height: "14px",
-                  background: "currentColor",
-                  marginLeft: "3px",
-                  verticalAlign: "middle",
-                  animation: "blink 1s step-end infinite",
-                }} />
-              )}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="aistation-chat-input-area">
-        <textarea
-          className="aistation-chat-textarea"
-          rows={2}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t("aistation.chatPlaceholder")}
-          disabled={sending}
-        />
-        <button
-          className="btn btn-primary btn-sm"
-          disabled={!input.trim() || sending}
-          onClick={handleSend}
-          style={{ alignSelf: "flex-end" }}
-        >
-          {t("aistation.sendBtn")}
-        </button>
-      </div>
     </div>
   );
 }
@@ -510,7 +361,6 @@ export default function AIStation(): React.JSX.Element {
 
   const tabItems: Array<{ id: TabView; label: string; Icon: typeof Cpu }> = [
     { id: "services", label: t("aistation.tabServices"), Icon: Cpu },
-    { id: "chat", label: t("aistation.tabChat"), Icon: MessageSquare },
     { id: "status", label: t("aistation.tabStatus"), Icon: Settings2 },
   ];
 
@@ -551,7 +401,6 @@ export default function AIStation(): React.JSX.Element {
 
       {/* Content */}
       {tab === "services" && <ServicesTab />}
-      {tab === "chat" && <ChatTab />}
       {tab === "status" && <StatusTab />}
     </div>
   );

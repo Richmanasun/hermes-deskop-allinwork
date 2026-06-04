@@ -846,7 +846,7 @@ interface HermesAPI {
   ) => Promise<{ content: string; path: string }>;
 
   // Vocabulary
-  vocabLookup: (words: string | string[]) => Promise<Array<{ char: string; pinyin?: string; meaning?: string }>>;
+  vocabLookup: (words: string | string[]) => Promise<Array<{ char: string; pinyin?: string; meaning?: string; frequency?: number }>>;
 
   // 9Router LLM
   nineRouterChat: (

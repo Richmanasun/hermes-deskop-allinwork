@@ -10,6 +10,7 @@ interface VocabEntry {
   char: string;
   pinyin?: string;
   meaning?: string;
+  frequency?: number;
 }
 
 interface WordHistoryItem {
@@ -500,6 +501,9 @@ export default function Translate({ profile: _profile }: TranslateProps): React.
                     <span className="translate-vocab-entry-word">{entry.char}</span>
                     {entry.pinyin && (
                       <span className="browser-vocab-pinyin">[{entry.pinyin}]</span>
+                    )}
+                    {entry.frequency != null && (
+                      <span className="vocab-freq-badge">{entry.frequency}</span>
                     )}
                     <button
                       className="btn-ghost"

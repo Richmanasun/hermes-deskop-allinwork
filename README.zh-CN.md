@@ -14,6 +14,8 @@
 </a>
 </p>
 
+> **关于本分支：** 本项目基于 [Hermes Desktop](https://github.com/fathah/hermes-desktop) 开源项目二次开发，在原有功能基础上新增了内置浏览器、文本翻译和 AI 工作站模块，同时集成了作者个人的英文单词生词库，以辅助日常学习与工作。如需原版功能，请访问上游仓库。
+
 > **本项目处于活跃开发阶段。** 功能可能会发生变化，某些功能也可能会失效。如果您遇到问题或有好的想法，请 [提交 Issue](https://github.com/fathah/hermes-desktop/issues)。欢迎贡献代码！
 
 ## 语言

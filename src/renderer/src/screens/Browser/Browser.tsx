@@ -33,6 +33,7 @@ interface VocabEntry {
   char: string;
   pinyin?: string;
   meaning?: string;
+  frequency?: number;
 }
 
 interface WordHistoryItem {
@@ -836,6 +837,9 @@ export default function Browser({ profile }: BrowserProps): React.JSX.Element {
                               <span className="browser-vocab-word-en">{entry.char}</span>
                               {entry.pinyin && (
                                 <span className="browser-vocab-pinyin">[{entry.pinyin}]</span>
+                              )}
+                              {entry.frequency != null && (
+                                <span className="vocab-freq-badge">{entry.frequency}</span>
                               )}
                               <button
                                 className="btn-ghost"

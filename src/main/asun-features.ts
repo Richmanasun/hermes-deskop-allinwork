@@ -188,8 +188,6 @@ export interface Bookmark {
 }
 
 const DEFAULT_BOOKMARKS: Bookmark[] = [
-  { label: "🌐 明镜亦非台", url: "http://117.72.165.243/" },
-  { label: "🌐 FNTMail", url: "https://corp-webmail-ssl.21cn.com/webmail/new_webmail/index.html?version=202664#/user/login" },
   { label: "🌐 China Daily", url: "http://www.chinadaily.com.cn/" },
   { label: "🌐 ChatGPT", url: "https://chatgpt.com/" },
   { label: "🌐 BS", url: "https://www.baostock.com/mainContent?file=home.md" },
@@ -246,7 +244,21 @@ export async function listAiStationServices(
     const res = await fetch(`${url}/services`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return FALLBACK_SERVICES;
     const json = await res.json();
-    return Array.isArray(json) ? (json as AiStationService[]) : FALLBACK_SERVICES;
+
+    // Array format (future-proofing): [{id, name, status, port}, ...]
+    if (Array.isArray(json)) return json as AiStationService[];
+
+    // Object format returned by AsunStation: { comfyui: {running, pid}, ... }
+    if (json && typeof json === "object") {
+      return FALLBACK_SERVICES.map((svc) => {
+        const info = json[svc.id] as { running?: boolean } | undefined;
+        const status: AiStationService["status"] =
+          info == null ? "unknown" : info.running ? "running" : "stopped";
+        return { ...svc, status };
+      });
+    }
+
+    return FALLBACK_SERVICES;
   } catch {
     return FALLBACK_SERVICES;
   }
