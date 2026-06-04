@@ -28,6 +28,9 @@ import installEn from "./locales/en/install";
 import constantsEn from "./locales/en/constants";
 import kanbanEn from "./locales/en/kanban";
 import diagnoseEn from "./locales/en/diagnose";
+import browserEn from "./locales/en/browser";
+import aistationEn from "./locales/en/aistation";
+import translateEn from "./locales/en/translate";
 import commonPl from "./locales/pl/common";
 import navigationPl from "./locales/pl/navigation";
 import welcomePl from "./locales/pl/welcome";
@@ -112,6 +115,9 @@ import memoryZh from "./locales/zh-CN/memory";
 import installZh from "./locales/zh-CN/install";
 import constantsZh from "./locales/zh-CN/constants";
 import kanbanZh from "./locales/zh-CN/kanban";
+import browserZh from "./locales/zh-CN/browser";
+import aistationZh from "./locales/zh-CN/aistation";
+import translateZh from "./locales/zh-CN/translate";
 import commonZhTw from "./locales/zh-TW/common";
 import navigationZhTw from "./locales/zh-TW/navigation";
 import welcomeZhTw from "./locales/zh-TW/welcome";
@@ -243,6 +249,9 @@ export const resources = {
       constants: constantsEn,
       kanban: kanbanEn,
       diagnose: diagnoseEn,
+      browser: browserEn,
+      aistation: aistationEn,
+      translate: translateEn,
     },
   },
   pl: {
@@ -343,6 +352,9 @@ export const resources = {
       install: installZh,
       constants: constantsZh,
       kanban: kanbanZh,
+      browser: browserZh,
+      aistation: aistationZh,
+      translate: translateZh,
     },
   },
   "zh-TW": {

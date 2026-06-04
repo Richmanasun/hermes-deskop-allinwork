@@ -13,4 +13,9 @@ export default {
   kanban: "看板",
   gateway: "网关",
   settings: "设置",
+  browser: "浏览器",
+  aistation: "AI 工作站",
+  translate: "翻译",
+  collapse: "收起",
+  expand: "展开",
 } as const;

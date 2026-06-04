@@ -17,6 +17,9 @@ import Models from "../Models/Models";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
+import Browser from "../Browser/Browser";
+import AIStation from "../AIStation/AIStation";
+import Translate from "../Translate/Translate";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import hermeslogo from "../../assets/hermes.png";
@@ -34,7 +37,9 @@ import {
   Timer,
   Kanban as KanbanIcon,
   Download,
+  Globe,
 } from "../../assets/icons";
+import { Languages, Cpu, ChevronLeft, ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
@@ -51,6 +56,9 @@ type View =
   | "schedules"
   | "kanban"
   | "gateway"
+  | "browser"
+  | "aistation"
+  | "translate"
   | "settings";
 
 const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
@@ -67,6 +75,9 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
+  { view: "browser", icon: Globe, labelKey: "navigation.browser" },
+  { view: "aistation", icon: Cpu, labelKey: "navigation.aistation" },
+  { view: "translate", icon: Languages, labelKey: "navigation.translate" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
 ];
 
@@ -83,6 +94,7 @@ function Layout({
 }: LayoutProps = {}): React.JSX.Element {
   const { t } = useI18n();
   const [view, setView] = useState<View>("chat");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [activeProfile, setActiveProfile] = useState("default");
@@ -227,7 +239,7 @@ function Layout({
 
   return (
     <div className="layout">
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarCollapsed ? " sidebar--collapsed" : ""}`}>
         <div className="sidebar-brand">
           <img src={hermeslogo} height={30} alt="" />
         </div>
@@ -238,12 +250,22 @@ function Layout({
               key={v}
               className={`sidebar-nav-item ${view === v ? "active" : ""}`}
               onClick={() => goTo(v)}
+              title={sidebarCollapsed ? t(labelKey) : undefined}
             >
               <Icon size={16} />
-              {t(labelKey)}
+              {!sidebarCollapsed && t(labelKey)}
             </button>
           ))}
         </nav>
+
+        <button
+          className="sidebar-collapse-toggle"
+          onClick={() => setSidebarCollapsed((c) => !c)}
+          title={sidebarCollapsed ? t("navigation.expand") : t("navigation.collapse")}
+        >
+          {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {!sidebarCollapsed && <span>{t("navigation.collapse")}</span>}
+        </button>
 
         <div className="sidebar-footer">
           {updateState && (
@@ -253,23 +275,25 @@ function Layout({
               }`}
               onClick={handleUpdate}
               disabled={updateState === "downloading"}
-              title={updateError ?? undefined}
+              title={updateError ?? updateState === "available"
+                ? t("common.updateAvailable", { version: updateVersion ?? "" })
+                : undefined}
             >
               <Download size={13} />
-              {updateState === "available" && (
+              {!sidebarCollapsed && updateState === "available" && (
                 <span>
                   {t("common.updateAvailable", { version: updateVersion })}
                 </span>
               )}
-              {updateState === "downloading" && (
+              {!sidebarCollapsed && updateState === "downloading" && (
                 <span>
                   {t("common.downloading", { percent: downloadPercent })}
                 </span>
               )}
-              {updateState === "ready" && (
+              {!sidebarCollapsed && updateState === "ready" && (
                 <span>{t("common.restartToUpdate")}</span>
               )}
-              {updateState === "error" && (
+              {!sidebarCollapsed && updateState === "error" && (
                 <span>{t("common.updateFailed")}</span>
               )}
             </button>
@@ -410,6 +434,24 @@ function Layout({
             ) : (
               <Gateway profile={activeProfile} />
             )}
+          </div>
+        )}
+
+        {visitedViews.has("browser") && (
+          <div style={paneStyle("browser")}>
+            <Browser profile={activeProfile} />
+          </div>
+        )}
+
+        {visitedViews.has("aistation") && (
+          <div style={paneStyle("aistation")}>
+            <AIStation />
+          </div>
+        )}
+
+        {visitedViews.has("translate") && (
+          <div style={paneStyle("translate")}>
+            <Translate profile={activeProfile} />
           </div>
         )}
 

@@ -13,4 +13,9 @@ export default {
   kanban: "Kanban",
   gateway: "Gateway",
   settings: "Configuración",
+  browser: "Navegador",
+  aistation: "Estación AI",
+  translate: "Traducir",
+  collapse: "Contraer",
+  expand: "Expandir",
 } as const;

@@ -129,16 +129,17 @@ describe("Electron app navigation policy", () => {
 });
 
 describe("Electron webview policy", () => {
-  it("allows only loopback HTTP URLs on app-controlled ports", () => {
+  it("allows any http:// or https:// URL (Browser screen needs external navigation)", () => {
     expect(isAllowedWebviewUrl("http://localhost:3000")).toBe(true);
     expect(isAllowedWebviewUrl("http://127.0.0.1:65535/path")).toBe(true);
     expect(isAllowedWebviewUrl("http://[::1]:3000")).toBe(true);
+    expect(isAllowedWebviewUrl("https://localhost:3000")).toBe(true);
+    expect(isAllowedWebviewUrl("http://example.com:3000")).toBe(true);
+    expect(isAllowedWebviewUrl("http://localhost:80")).toBe(true);
+    expect(isAllowedWebviewUrl("https://google.com")).toBe(true);
   });
 
-  it("blocks remote, privileged, and non-HTTP webview URLs", () => {
-    expect(isAllowedWebviewUrl("https://localhost:3000")).toBe(false);
-    expect(isAllowedWebviewUrl("http://example.com:3000")).toBe(false);
-    expect(isAllowedWebviewUrl("http://localhost:80")).toBe(false);
+  it("blocks non-http webview URLs", () => {
     expect(isAllowedWebviewUrl("file:///C:/Users/me/page.html")).toBe(false);
     expect(isAllowedWebviewUrl("javascript:alert(1)")).toBe(false);
   });
@@ -165,7 +166,7 @@ describe("Electron webview policy", () => {
     expect(webPreferences.allowRunningInsecureContent).toBe(false);
   });
 
-  it("blocks post-attachment navigation away from loopback webview URLs", () => {
+  it("allows http/https webview navigation and blocks non-http protocols", () => {
     type NavigationHandler = (
       event: { preventDefault: () => void },
       url: string,
@@ -190,16 +191,26 @@ describe("Electron webview policy", () => {
     expect(handlers.has("will-navigate")).toBe(true);
     expect(handlers.has("will-redirect")).toBe(true);
 
-    const allowedEvent = { preventDefault: vi.fn() };
-    handlers.get("will-navigate")?.(allowedEvent, "http://localhost:3000");
-    expect(allowedEvent.preventDefault).not.toHaveBeenCalled();
+    // http:// and https:// are allowed (Browser screen needs external navigation)
+    const localhostEvent = { preventDefault: vi.fn() };
+    handlers.get("will-navigate")?.(localhostEvent, "http://localhost:3000");
+    expect(localhostEvent.preventDefault).not.toHaveBeenCalled();
 
-    const blockedEvent = { preventDefault: vi.fn() };
-    handlers.get("will-navigate")?.(blockedEvent, "http://attacker.com:3000");
-    expect(blockedEvent.preventDefault).toHaveBeenCalled();
+    const externalHttpEvent = { preventDefault: vi.fn() };
+    handlers.get("will-navigate")?.(externalHttpEvent, "http://example.com");
+    expect(externalHttpEvent.preventDefault).not.toHaveBeenCalled();
 
-    const redirectedEvent = { preventDefault: vi.fn() };
-    handlers.get("will-redirect")?.(redirectedEvent, "http://example.com:3000");
-    expect(redirectedEvent.preventDefault).toHaveBeenCalled();
+    const httpsEvent = { preventDefault: vi.fn() };
+    handlers.get("will-redirect")?.(httpsEvent, "https://example.com");
+    expect(httpsEvent.preventDefault).not.toHaveBeenCalled();
+
+    // Non-http protocols are still blocked
+    const fileEvent = { preventDefault: vi.fn() };
+    handlers.get("will-navigate")?.(fileEvent, "file:///etc/passwd");
+    expect(fileEvent.preventDefault).toHaveBeenCalled();
+
+    const jsEvent = { preventDefault: vi.fn() };
+    handlers.get("will-navigate")?.(jsEvent, "javascript:alert(1)");
+    expect(jsEvent.preventDefault).toHaveBeenCalled();
   });
 });

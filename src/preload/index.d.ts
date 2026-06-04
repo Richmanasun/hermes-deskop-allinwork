@@ -349,6 +349,7 @@ interface HermesAPI {
     }) => void,
   ) => () => void;
   onChatError: (callback: (error: string) => void) => () => void;
+  onBrowserOpenTab: (callback: (url: string) => void) => () => void;
 
   // Gateway
   startGateway: () => Promise<boolean>;
@@ -754,6 +755,8 @@ interface HermesAPI {
     filePath: string,
     maxBytes?: number,
   ) => Promise<{ content: string; truncated: boolean } | null>;
+  openFileDialog: () => Promise<string | null>;
+  parseFileText: (filePath: string) => Promise<{ text: string } | { error: string }>;
   openFileInEditor: (filePath: string) => Promise<boolean>;
   readImageFile: (filePath: string) => Promise<string | null>;
   kanbanAssignTask: (
@@ -841,6 +844,46 @@ interface HermesAPI {
     logFile?: string,
     lines?: number,
   ) => Promise<{ content: string; path: string }>;
+
+  // Vocabulary
+  vocabLookup: (words: string | string[]) => Promise<Array<{ char: string; pinyin?: string; meaning?: string }>>;
+
+  // 9Router LLM
+  nineRouterChat: (
+    messages: Array<{ role: string; content: string }>,
+    model: string,
+    requestId: string,
+    baseUrl?: string,
+  ) => Promise<void>;
+  nineRouterAbort: () => Promise<void>;
+  nineRouterTranslate: (text: string, direction: "zh2en" | "en2zh", baseUrl?: string) => Promise<string>;
+  onNineRouterChunk: (
+    callback: (data: { requestId: string; content: string | null; error?: string }) => void,
+  ) => () => void;
+
+  // MyMemory
+  myMemoryTranslate: (text: string, langpair: string) => Promise<string>;
+
+  // AIStation
+  aiStationGetConfig: () => Promise<{ url: string }>;
+  aiStationSetConfig: (url: string) => Promise<void>;
+  aiStationListServices: () => Promise<
+    Array<{
+      id: string;
+      name: string;
+      status: "running" | "stopped" | "unknown";
+      port?: number;
+      description: string;
+    }>
+  >;
+  aiStationControl: (
+    serviceId: string,
+    action: "start" | "stop" | "restart",
+  ) => Promise<{ success: boolean; error?: string }>;
+  aiStationGetLogs: (serviceId: string) => Promise<string>;
+  aiStationTestConnection: (url: string) => Promise<boolean>;
+  getBookmarks: () => Promise<Array<{ label: string; url: string }>>;
+  saveBookmarks: (bookmarks: Array<{ label: string; url: string }>) => Promise<void>;
 }
 
 declare global {

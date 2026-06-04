@@ -177,8 +177,23 @@ import {
 } from "./kanban";
 import { getAppLocale, setAppLocale } from "./locale";
 import {
+  lookupVocab,
+  streamNineRouterChat,
+  abortNineRouterChat,
+  translateNineRouter,
+  translateMyMemory,
+  getAiStationConfig,
+  setAiStationConfig,
+  listAiStationServices,
+  controlAiStationService,
+  getAiStationLogs,
+  testAiStationConnection,
+  getBookmarks,
+  saveBookmarks,
+  type Bookmark,
+} from "./asun-features";
+import {
   hardenAttachedWebContents,
-  hardenWebviewPreferences,
   isAllowedAppNavigationUrl,
   isAllowedExternalUrl,
   isAllowedWebviewUrl,
@@ -342,7 +357,15 @@ function createWindow(): void {
         return;
       }
 
-      hardenWebviewPreferences(webPreferences);
+      // Set our trusted preload that handles link interception and word capture.
+      // sandbox must be false so the preload can access ipcRenderer.sendToHost.
+      webPreferences.preload = join(__dirname, "../preload/webview-preload.js");
+      delete (webPreferences as Record<string, unknown>).preloadURL;
+      webPreferences.nodeIntegration = false;
+      webPreferences.contextIsolation = false;
+      webPreferences.sandbox = false;
+      webPreferences.webSecurity = true;
+      webPreferences.allowRunningInsecureContent = false;
     },
   );
 
@@ -908,7 +931,7 @@ function setupIPC(): void {
                 .trim()
                 .slice(0, 80);
               new Notification({
-                title: "Hermes Agent",
+                title: "Asun Agent",
                 body: preview || "Response ready",
               }).show();
             }
@@ -920,7 +943,7 @@ function setupIPC(): void {
             // Notify on error too if window not focused
             if (mainWindow && !mainWindow.isFocused()) {
               new Notification({
-                title: "Hermes Agent — Error",
+                title: "Asun Agent — Error",
                 body: error.slice(0, 100),
               }).show();
             }
@@ -1699,6 +1722,111 @@ function setupIPC(): void {
       return sshReadLogs(conn.ssh, logFile, lines);
     return readLogs(logFile, lines);
   });
+
+  // ── Vocabulary ──────────────────────────────────────────────────────────────
+  ipcMain.handle("vocab-lookup", (_event, words: string | string[]) => lookupVocab(words));
+
+  // ── 9Router (OpenAI-compatible local LLM) ───────────────────────────────────
+  ipcMain.handle(
+    "nine-router-chat",
+    async (
+      event,
+      messages: Array<{ role: string; content: string }>,
+      model: string,
+      requestId: string,
+      baseUrl?: string,
+    ) => {
+      const url = baseUrl || "http://localhost:20128/v1";
+      const conn = getConnectionConfig();
+      const apiKey = conn.mode === "ssh" && conn.ssh
+        ? await sshGetConfigValue(conn.ssh, "model.api_key")
+        : getConfigValue("model.api_key") ?? undefined;
+      await streamNineRouterChat(messages, model, requestId, url, (id, content, error) => {
+        event.sender.send("nine-router-chunk", { requestId: id, content, error });
+      }, apiKey || undefined);
+    },
+  );
+
+  ipcMain.handle("nine-router-abort", () => abortNineRouterChat());
+
+  ipcMain.handle(
+    "nine-router-translate",
+    async (_event, text: string, direction: "zh2en" | "en2zh", baseUrl?: string) => {
+      const conn = getConnectionConfig();
+      const [apiKey, modelName] = conn.mode === "ssh" && conn.ssh
+        ? await Promise.all([
+            sshGetConfigValue(conn.ssh, "model.api_key"),
+            sshGetConfigValue(conn.ssh, "model.default"),
+          ])
+        : [
+            getConfigValue("model.api_key"),
+            getConfigValue("model.default"),
+          ];
+      return translateNineRouter(
+        text, direction,
+        baseUrl || "http://localhost:20128/v1",
+        apiKey || undefined,
+        modelName || undefined,
+      );
+    },
+  );
+
+  ipcMain.handle("open-file-dialog", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "Documents",
+          extensions: ["txt","md","markdown","pdf","docx","pptx","html","htm","csv","tsv","json","xml"],
+        },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle(
+    "parse-file-text",
+    async (_event, filePath: string): Promise<{ text: string } | { error: string }> => {
+      try {
+        const { parseFileToText } = await import("./file-parser");
+        const text = await parseFileToText(filePath);
+        return { text: text.slice(0, 300000) };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    },
+  );
+
+  // ── MyMemory Translation ─────────────────────────────────────────────────────
+  ipcMain.handle("mymemory-translate", (_event, text: string, langpair: string) =>
+    translateMyMemory(text, langpair),
+  );
+
+  // ── Browser bookmarks ────────────────────────────────────────────────────────
+  ipcMain.handle("get-bookmarks", () => getBookmarks());
+  ipcMain.handle("save-bookmarks", (_event, bookmarks: Bookmark[]) => saveBookmarks(bookmarks));
+
+  // ── AIStation ────────────────────────────────────────────────────────────────
+  ipcMain.handle("aistation-get-config", () => getAiStationConfig());
+  ipcMain.handle("aistation-set-config", (_event, url: string) =>
+    setAiStationConfig(url),
+  );
+  ipcMain.handle("aistation-list-services", () => {
+    const { url } = getAiStationConfig();
+    return listAiStationServices(url);
+  });
+  ipcMain.handle("aistation-control", (_event, serviceId: string, action: string) => {
+    const { url } = getAiStationConfig();
+    return controlAiStationService(url, serviceId, action as "start" | "stop" | "restart");
+  });
+  ipcMain.handle("aistation-get-logs", (_event, serviceId: string) => {
+    const { url } = getAiStationConfig();
+    return getAiStationLogs(url, serviceId);
+  });
+  ipcMain.handle("aistation-test-connection", (_event, url: string) =>
+    testAiStationConnection(url),
+  );
 }
 
 function buildMenu(): void {
@@ -1904,6 +2032,13 @@ if (process.env.ENABLE_CDP === "1") {
   );
 }
 
+// Chromium 94+ auto-upgrades http:// navigations to https:// (HTTPS-First Mode).
+// Disable it so the browser webview can load HTTP-only sites.
+app.commandLine.appendSwitch(
+  "disable-features",
+  "HttpsFirstBalancedMode,HttpsUpgrades,AutoupgradeMixedContent",
+);
+
 app.whenReady().then(() => {
   app.name = "Hermes";
   electronApp.setAppUserModelId("com.nousresearch.hermes");
@@ -1927,6 +2062,16 @@ app.whenReady().then(() => {
   app.on("web-contents-created", (_event, contents) => {
     if (contents.getType() === "webview") {
       hardenAttachedWebContents(contents);
+      // Override setWindowOpenHandler so new-window requests (target="_blank",
+      // window.open) are forwarded to the renderer as a tab-open command instead
+      // of spawning a native BrowserWindow. This is more reliable than the
+      // deprecated webview `new-window` DOM event in Electron 39+.
+      contents.setWindowOpenHandler(({ url }) => {
+        if (isAllowedWebviewUrl(url) && mainWindow) {
+          mainWindow.webContents.send("browser-open-tab", url);
+        }
+        return { action: "deny" };
+      });
     }
   });
 
@@ -1934,6 +2079,18 @@ app.whenReady().then(() => {
   setupIPC();
   createWindow();
   setupUpdater();
+
+  // Mirror reference: use did-attach-webview on the main window to reliably
+  // intercept all new-window requests from webviews (more robust than
+  // web-contents-created in Electron 39+).
+  mainWindow?.webContents.on("did-attach-webview", (_, webviewContents) => {
+    webviewContents.setWindowOpenHandler(({ url }) => {
+      if (isAllowedWebviewUrl(url) && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("browser-open-tab", url);
+      }
+      return { action: "deny" };
+    });
+  });
 
   // Auto-start SSH tunnel if configured
   const conn = getConnectionConfig();

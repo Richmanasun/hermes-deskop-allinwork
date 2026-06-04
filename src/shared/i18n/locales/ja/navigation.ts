@@ -13,4 +13,9 @@ export default {
   kanban: "カンバン",
   gateway: "ゲートウェイ",
   settings: "設定",
+  browser: "ブラウザ",
+  aistation: "AIステーション",
+  translate: "翻訳",
+  collapse: "折りたたむ",
+  expand: "展開",
 } as const;

@@ -7,7 +7,7 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
-        external: ["better-sqlite3"],
+        external: ["better-sqlite3", "pdf-parse", "mammoth", "jszip"],
       },
     },
   },
@@ -17,6 +17,7 @@ export default defineConfig({
         input: {
           index: resolve("src/preload/index.ts"),
           askpass: resolve("src/preload/askpass.ts"),
+          "webview-preload": resolve("src/preload/webview-preload.ts"),
         },
       },
     },

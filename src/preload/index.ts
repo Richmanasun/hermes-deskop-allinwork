@@ -435,6 +435,13 @@ const hermesAPI = {
     return () => ipcRenderer.removeListener("chat-error", handler);
   },
 
+  onBrowserOpenTab: (callback: (url: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, url: string): void =>
+      callback(url);
+    ipcRenderer.on("browser-open-tab", handler);
+    return () => ipcRenderer.removeListener("browser-open-tab", handler);
+  },
+
   // Gateway
   startGateway: (): Promise<boolean> => ipcRenderer.invoke("start-gateway"),
   stopGateway: (): Promise<boolean> => ipcRenderer.invoke("stop-gateway"),
@@ -935,6 +942,10 @@ const hermesAPI = {
     maxBytes?: number,
   ): Promise<{ content: string; truncated: boolean } | null> =>
     ipcRenderer.invoke("read-file", filePath, maxBytes),
+  openFileDialog: (): Promise<string | null> =>
+    ipcRenderer.invoke("open-file-dialog"),
+  parseFileText: (filePath: string): Promise<{ text: string } | { error: string }> =>
+    ipcRenderer.invoke("parse-file-text", filePath),
   openFileInEditor: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke("open-file-in-editor", filePath),
   readImageFile: (filePath: string): Promise<string | null> =>
@@ -1008,6 +1019,76 @@ const hermesAPI = {
     lines?: number,
   ): Promise<{ content: string; path: string }> =>
     ipcRenderer.invoke("read-logs", logFile, lines),
+
+  // Vocabulary lookup (AsunOS migration)
+  vocabLookup: (words: string | string[]): Promise<Array<{ char: string; pinyin?: string; meaning?: string }>> =>
+    ipcRenderer.invoke("vocab-lookup", words),
+
+  // 9Router LLM (local OpenAI-compatible, port 20128 by default)
+  nineRouterChat: (
+    messages: Array<{ role: string; content: string }>,
+    model: string,
+    requestId: string,
+    baseUrl?: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke("nine-router-chat", messages, model, requestId, baseUrl),
+
+  nineRouterAbort: (): Promise<void> => ipcRenderer.invoke("nine-router-abort"),
+
+  nineRouterTranslate: (
+    text: string,
+    direction: "zh2en" | "en2zh",
+    baseUrl?: string,
+  ): Promise<string> =>
+    ipcRenderer.invoke("nine-router-translate", text, direction, baseUrl),
+
+  onNineRouterChunk: (
+    callback: (data: { requestId: string; content: string | null; error?: string }) => void,
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown): void =>
+      callback(data as { requestId: string; content: string | null; error?: string });
+    ipcRenderer.on("nine-router-chunk", handler);
+    return () => ipcRenderer.removeListener("nine-router-chunk", handler);
+  },
+
+  // MyMemory translation
+  myMemoryTranslate: (text: string, langpair: string): Promise<string> =>
+    ipcRenderer.invoke("mymemory-translate", text, langpair),
+
+  // AIStation service management
+  aiStationGetConfig: (): Promise<{ url: string }> =>
+    ipcRenderer.invoke("aistation-get-config"),
+
+  aiStationSetConfig: (url: string): Promise<void> =>
+    ipcRenderer.invoke("aistation-set-config", url),
+
+  aiStationListServices: (): Promise<
+    Array<{
+      id: string;
+      name: string;
+      status: "running" | "stopped" | "unknown";
+      port?: number;
+      description: string;
+    }>
+  > => ipcRenderer.invoke("aistation-list-services"),
+
+  aiStationControl: (
+    serviceId: string,
+    action: "start" | "stop" | "restart",
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke("aistation-control", serviceId, action),
+
+  aiStationGetLogs: (serviceId: string): Promise<string> =>
+    ipcRenderer.invoke("aistation-get-logs", serviceId),
+
+  aiStationTestConnection: (url: string): Promise<boolean> =>
+    ipcRenderer.invoke("aistation-test-connection", url),
+
+  // Browser bookmarks
+  getBookmarks: (): Promise<Array<{ label: string; url: string }>> =>
+    ipcRenderer.invoke("get-bookmarks"),
+  saveBookmarks: (bookmarks: Array<{ label: string; url: string }>): Promise<void> =>
+    ipcRenderer.invoke("save-bookmarks", bookmarks),
 };
 
 if (process.contextIsolated) {

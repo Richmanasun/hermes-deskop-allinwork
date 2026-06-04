@@ -13,4 +13,9 @@ export default {
   kanban: "Kanban",
   gateway: "Gateway",
   settings: "Ayarlar",
+  browser: "Tarayıcı",
+  aistation: "AI İstasyonu",
+  translate: "Çeviri",
+  collapse: "Daralt",
+  expand: "Genişlet",
 } as const;
